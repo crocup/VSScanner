@@ -30,14 +30,15 @@ coll = db[config.get("DATABASE_SCANNER", "COLLECTION")]
 
 if __name__ == "__main__":
     result = coll.find_one({"ip": config.get("SETTING", "TARGET")})
-    vuln_search = VulnerSearch()
     for port in result['result_scan']['tcp']:
         cpe = result['result_scan']['tcp'][str(port)]['cpe']
         product = result['result_scan']['tcp'][str(port)]['product'] + " " + \
                   result['result_scan']['tcp'][str(port)]['version']
+        vuln_search = VulnerSearch(cpe=cpe)
         if len(cpe) > 0:
             print(cpe)
-            res = vuln_search.search_circl(cpe=cpe)
+            print(product)
+            res = vuln_search.search_circl()
             # res = search_circl(cpe=cpe)
             print(res)
             # print(cpe)
