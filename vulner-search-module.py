@@ -1,9 +1,12 @@
+import datetime
 import os
 import logging.config
 import configparser
 import pymongo
+import json
 import requests
 from components.search_vulnerability import VulnerSearch
+from components.record_database import RecordMongo
 import pprint
 
 _log_path = "logs/"
@@ -27,20 +30,19 @@ client = pymongo.MongoClient()
 db = client[config.get("DATABASE_SCANNER", "BASE")]
 coll = db[config.get("DATABASE_SCANNER", "COLLECTION")]
 
-
 if __name__ == "__main__":
-    result = coll.find_one({"ip": config.get("SETTING", "TARGET")})
+    ip = config.get("SETTING", "TARGET")
+    result = coll.find_one({"ip": ip})
+    record_in_mongo = RecordMongo(db=config.get("DATABASE_SCANNER", "BASE"), coll=config.get("DATABASE_SCANNER", "COLLECTION"))
     for port in result['result_scan']['tcp']:
         cpe = result['result_scan']['tcp'][str(port)]['cpe']
         product = result['result_scan']['tcp'][str(port)]['product'] + " " + \
                   result['result_scan']['tcp'][str(port)]['version']
         vuln_search = VulnerSearch(cpe=cpe)
         if len(cpe) > 0:
-            print(cpe)
-            print(product)
             res = vuln_search.search_circl()
-            # res = search_circl(cpe=cpe)
             print(res)
-            # print(cpe)
-            # print(product)
+            now = datetime.datetime.now()
+            record_in_mongo.database_vulner_search_tcp(ip=ip, time=now, port=port, cve=res)
     client.close()
+    record_in_mongo.close_connection()
