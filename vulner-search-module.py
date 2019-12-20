@@ -3,10 +3,8 @@ import os
 import logging.config
 import configparser
 import pymongo
-import vulners
 from components.search_vulnerability import VulnerSearch
 from components.record_database import RecordMongo
-import pprint
 
 _log_path = "logs/"
 if not os.path.exists(_log_path):
@@ -34,27 +32,21 @@ if __name__ == "__main__":
     result = coll.find_one({"ip": ip})
     record_in_mongo = RecordMongo(db=config.get("DATABASE_SCANNER", "BASE"),
                                   coll=config.get("DATABASE_SCANNER", "COLLECTION"))
-    vulners_api = vulners.Vulners(api_key=config.get("VULNERS", "API"))
     for port in result['result_scan']['tcp']:
         cpe = result['result_scan']['tcp'][str(port)]['cpe']
         product_version = result['result_scan']['tcp'][str(port)]['product'] + " " + \
-                  result['result_scan']['tcp'][str(port)]['version']
+                          result['result_scan']['tcp'][str(port)]['version']
         product = result['result_scan']['tcp'][str(port)]['product']
         version = result['result_scan']['tcp'][str(port)]['version']
         if len(cpe) > 0:
             now = datetime.datetime.now()
             vuln_search = VulnerSearch(cpe=cpe)
-            res = vuln_search.search_circl()
-            pprint.pprint(res)
-            if len(version) > 0:
-                cpe_results = vulners_api.cpeVulnerabilities(cpe)
-                cpe_exploit_list = cpe_results.get('exploit')
-                cpe_vulnerabilities_list = [cpe_results.get(key) for key in cpe_results if
-                                            key not in ['info', 'blog', 'bugbounty']]
-                pprint.pprint(cpe_vulnerabilities_list)
-            else:
-                cpe_vulnerabilities_list = vulners_api.searchExploit(product_version, limit=25)
+            vulnerabilities_cve_list = vuln_search.search_circl()
+            vulnerabilities_exploit_list = vuln_search.search_vulners(api_key=config.get("VULNERS", "API"),
+                                                                      version=version,
+                                                                      product_version=product_version)
             record_in_mongo.database_vulner_search_tcp(ip=ip, time=now, port=port,
-                                                       cve=res, exploit=cpe_vulnerabilities_list)
+                                                       cve=vulnerabilities_cve_list,
+                                                       exploit=vulnerabilities_exploit_list)
     client.close()
     record_in_mongo.close_connection()
